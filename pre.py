@@ -62,13 +62,9 @@ def main():
 
     annotations = glob('/home/vitallab/ssd/vitallab/frames24/*/*/*.csv')
     
-    # with multiprocessing.Pool(processes=8) as pool:
-    #     for _ in tqdm(pool.imap_unordered(annotation, annotations), total=len(annotations)):
-    #         pass
-
-    for a in annotations:
-        if '49381' in a:
-            annotation(a)
+    with multiprocessing.Pool(processes=8) as pool:
+        for _ in tqdm(pool.imap_unordered(annotation, annotations), total=len(annotations)):
+            pass
 
 
 def annotation(path):

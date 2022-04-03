@@ -7,11 +7,36 @@ from typing import Any, Callable, List, Optional, Tuple, Type
 
 import torch
 import torch.utils.data
-from iopath.common.file_io import g_pathmgr
 from pytorchvideo.data.clip_sampling import ClipSampler
 from pytorchvideo.data.frame_video import FrameVideo
 
 from pytorchvideo.data.utils import MultiProcessSampler
+
+
+def iter_from_path(path, sampler, transform):
+    # ~/situation_number, view/imgs
+    dash = os.path.join(path, 'DashBoard_*')[0]
+    label = int(dash.split('_')[-1])
+    dash = FrameVideo.from_directory(dash)
+    rear = FrameVideo.from_directory(os.path.join(path, 'Rear_*')[0])
+    right = FrameVideo.from_directory(os.path.join(path, 'Rightside_*')[0])
+    duration = min(dash.duration, rear.duration, right.duration)
+    next_clip_start_time = 0    
+    while True:
+        clip_start, clip_end, clip_index, aug_index, is_last_clip = sampler(
+            next_clip_start_time, duration, {}
+        )
+        next_clip_start_time = clip_end
+        yield {
+            'dash': dash.get_clip(clip_start, clip_end),
+            'rear': rear.get_clip(clip_start, clip_end),
+            'right': right.get_clip(clip_start, clip_end),
+            'start': clip_start,
+            'end': clip_end,
+            'label': label
+        }
+        if is_last_clip:
+            break
 
 
 class City(torch.utils.data.IterableDataset):
@@ -134,7 +159,7 @@ class City(torch.utils.data.IterableDataset):
         else:
             video_index = next(self._video_sampler_iter)
             path_to_video_frames = self._path_to_videos[video_index]
-            video = FrameVideo.from_directory(path_to_video_frames, multithreaded_io=True, fps=24)
+            video = FrameVideo.from_directory(path_to_video_frames, multithreaded_io=False, fps=24)
             self._loaded_video = (video, video_index)
 
         clip_start, clip_end, clip_index, aug_index, is_last_clip = self._clip_sampler(
