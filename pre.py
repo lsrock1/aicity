@@ -28,22 +28,51 @@ def read_and_save(path):
         count += 1
 
 
+def make_dir(path):
+    video_name = os.path.basename(path)
+    view_name = video_name.split('_')[0]
+    if view_name == 'Right':
+        view_name = 'Rightside'    
+    if view_name == 'Rearview':
+        view_name = 'Rear'
+    video_dir = video_name.split('_')[0] + '_' + video_name[-5]
+    basedir = os.path.dirname(path)
+    basedir = basedir.replace('2022', 'frames24')
+    basedir = os.path.join(basedir, video_dir)
+    if not os.path.exists(basedir):
+        os.makedirs(basedir)
+    return basedir
+
+
 def main():
     # videos = glob('/home/vitallab/ssd/vitallab/2022/*/*/*.MP4')
+    # for video in tqdm(videos):
 
+    #     save_dir = make_dir(video)
+    #     p = os.path.join(save_dir, '%d.png')
+    #     cmd = f'ffmpeg -i {video} -vf "scale=455:256,fps=24" {p}'
+    #     os.system(cmd)
+
+    # csvs = glob('/home/vitallab/ssd/vitallab/2022/*/*/*.csv')
+    # for c in csvs:
+    #     shutil.copy(c, c.replace('2022', 'frames24'))
     # with multiprocessing.Pool(processes=8) as pool:
     #     for _ in tqdm(pool.imap_unordered(read_and_save, videos), total=len(videos)):
     #         pass
 
-    annotations = glob('/home/vitallab/ssd/vitallab/frames/*/*/*.csv')
+    annotations = glob('/home/vitallab/ssd/vitallab/frames24/*/*/*.csv')
+    
+    # with multiprocessing.Pool(processes=8) as pool:
+    #     for _ in tqdm(pool.imap_unordered(annotation, annotations), total=len(annotations)):
+    #         pass
+
     for a in annotations:
-        if '24026' in a or '35133' in a or '38058' in a or '49381' in a:
-            continue
-        annotation(a)
+        if '49381' in a:
+            annotation(a)
 
 
 def annotation(path):
-    fps = 30
+    fps = 24
     df = pd.read_csv(path)
     if 'Filename' in df.columns:
         file_name_c = 'Filename'
@@ -64,10 +93,13 @@ def annotation(path):
             fn = [r.strip() for r in row[file_name_c].split('_')]
             if fn[0] == 'Right': fn[0] = 'Rightside'
             if fn[0] == 'Rearview': fn[0] = 'Rear'
+            print(fn[0])
             current = fn[0]# + '_' + fn[-1]
             postfix = fn[-1]
             prev_end = 0
             situation_count = 0
+        
+        # if 'Rear' not in current: continue
         try:
             start_time = datetime.strptime(row['Start Time'], '%H:%M:%S')
             start_time = start_time.hour * 3600 + start_time.minute * 60 + start_time.second
@@ -84,10 +116,9 @@ def annotation(path):
             prev_end = end_time
             continue
 
-        # if prev_end != 0:
-        extracted_frames[current].append((prev_end, start_time, 18))
-        frame_copy(situation_count, path, prev_end, start_time, current, 18, fps, postfix)
-        situation_count += 1
+        # extracted_frames[current].append((prev_end, start_time, 18))
+        # frame_copy(situation_count, path, prev_end, start_time, current, 18, fps, postfix)
+        # situation_count += 1
 
         extracted_frames[current].append(
             (start_time, end_time, int(float(row['Label/Class ID']))))
@@ -105,7 +136,9 @@ def frame_copy(situation_count, path, start_time, end_time, current, label, fps,
         os.makedirs(os.path.join(to_user_dir, situation_count, current+f'_{label}'))
         
     for i in range(start_time *fps, end_time * fps):
-        if not os.path.exists(os.path.join(user_dir, current + f'_{postfix}', f'{i}.png')): return
+        if not os.path.exists(os.path.join(user_dir, current + f'_{postfix}', f'{i}.png')): 
+            print(os.path.join(user_dir, current + f'_{postfix}', f'{i}.png'))
+            return
         shutil.copy(os.path.join(user_dir, current + f'_{postfix}', f'{i}.png'), os.path.join(to_user_dir, situation_count, current+f'_{label}', f'{i}.png'))
 
 

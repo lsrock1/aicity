@@ -17,7 +17,7 @@ from torchvision.transforms import (
 from pytorchvideo.data import LabeledVideoDataset
 import pytorch_lightning
 import pytorchvideo
-
+from data import City
 from glob import glob
 import os
 
@@ -27,7 +27,7 @@ std = [0.225, 0.225, 0.225]
 crop_size = 256
 num_frames = 32
 sampling_rate = 2
-frames_per_second = 30
+frames_per_second = 24
 alpha = 4
 
 
@@ -61,7 +61,7 @@ transform_val =  ApplyTransformToKey(
             ShortSideScale(
                 size=side_size
             ),
-            CenterCrop(244),
+            CenterCrop((244, 434)),
             PackPathway()
         ]
     ),
@@ -76,8 +76,8 @@ transform_train = Compose(
                     UniformTemporalSubsample(num_frames),
                     Lambda(lambda x: x / 255.0),
                     Normalize(mean, std),
-                    RandomShortSideScale(min_size=256, max_size=320),
-                    RandomCrop(244),
+                    ShortSideScale(256),
+                    RandomCrop((244, 434)),
                     RandomHorizontalFlip(p=0.5),
                     PackPathway()
                   ]
@@ -90,10 +90,11 @@ transform_train = Compose(
 class DataModule(pytorch_lightning.LightningDataModule):
 
     # Dataset configuration
-    _DATA_PATH = '/home/vitallab/ssd/vitallab/frames'
+    _DATA_PATH = '/home/vitallab/ssd/vitallab/frames24'
     _SKIP_CLASS = 18
+    _TARGET_VIEW = [0, ]
     _CLIP_DURATION = (num_frames * sampling_rate)/frames_per_second  # Duration of sampled clip for each video
-    _BATCH_SIZE = 8
+    _BATCH_SIZE = 4
     _NUM_WORKERS = 8  # Number of parallel processes fetching data
     _VIEW_MAPPING = {
         'Dashboard': 0,
@@ -103,16 +104,22 @@ class DataModule(pytorch_lightning.LightningDataModule):
 
     def load_dataset_(self, split='train'):
         # user_id_number/action_number/view
-        paths = glob(os.path.join(self._DATA_PATH, "*/*/*"))
-        print(paths)
+        paths = glob(os.path.join(self._DATA_PATH, "A1/*/*/*"))
+
         info = []
         for path in paths:
+            if not os.path.isdir(path): continue
+            # if len(os.listdir(path)) == 0:
+            assert len(os.listdir(path)) > 0, "No frames in {}".format(path)
             dirs = path.split('/')
             user_id, action_number, view = dirs[-3:]
+            # print(user_id)
+            # print(len(user_id.split('_')))
             if len(user_id.split('_')) != 4: continue
             view, label = view.split('_')
             label = int(label)
             if label == self._SKIP_CLASS: continue
+            if self._VIEW_MAPPING[view] not in self._TARGET_VIEW: continue
             info.append(
                 (
                     path, 
@@ -127,7 +134,19 @@ class DataModule(pytorch_lightning.LightningDataModule):
             info = info[:int(len(info) * 0.8)]
         else:
             info = info[int(len(info) * 0.8):]
-        return LabeledVideoDataset(info, pytorchvideo.data.make_clip_sampler("random", self._CLIP_DURATION), decode_audio=False)
+        print(len(info))
+        # count = {}
+        # for i in range(len(info)):
+        #     count[info[i][1]['label']] = count.get(info[i][1]['label'], 0) + 1
+        # for v in info:
+        #     print(v[1]['label'], v[1]['action_number'], v[1]['view'])
+        tf = transform_train if split == 'train' else transform_val
+        return City(
+            info,
+            pytorchvideo.data.make_clip_sampler("random", self._CLIP_DURATION),
+            transform=tf
+        )
+        # return LabeledVideoDataset(info, pytorchvideo.data.make_clip_sampler("random", self._CLIP_DURATION), decode_audio=False,  transform=)
 
     def train_dataloader(self):
         """
@@ -138,7 +157,7 @@ class DataModule(pytorch_lightning.LightningDataModule):
             self.load_dataset_(),
             batch_size=self._BATCH_SIZE,
             num_workers=self._NUM_WORKERS,
-            transform=transform_train
+           
         )
 
     def val_dataloader(self):
@@ -151,10 +170,11 @@ class DataModule(pytorch_lightning.LightningDataModule):
             val_dataset,
             batch_size=self._BATCH_SIZE,
             num_workers=self._NUM_WORKERS,
-            transform=transform_val
         )
 
 
 if __name__ == '__main__':
     d = DataModule()
     d.load_dataset_()
+    print('done')
+    d.load_dataset_('val')
