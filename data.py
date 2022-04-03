@@ -2,6 +2,7 @@ import csv
 import functools
 import itertools
 import os
+import random
 from collections import defaultdict
 from typing import Any, Callable, List, Optional, Tuple, Type
 
@@ -13,7 +14,7 @@ from pytorchvideo.data.frame_video import FrameVideo
 from pytorchvideo.data.utils import MultiProcessSampler
 
 
-def iter_from_path(path, sampler, transform):
+def iter_from_path(path, clip_duration, transform):
     # ~/situation_number, view/imgs
     dash = os.path.join(path, 'DashBoard_*')[0]
     label = int(dash.split('_')[-1])
@@ -21,22 +22,33 @@ def iter_from_path(path, sampler, transform):
     rear = FrameVideo.from_directory(os.path.join(path, 'Rear_*')[0])
     right = FrameVideo.from_directory(os.path.join(path, 'Rightside_*')[0])
     duration = min(dash.duration, rear.duration, right.duration)
-    next_clip_start_time = 0    
-    while True:
-        clip_start, clip_end, clip_index, aug_index, is_last_clip = sampler(
-            next_clip_start_time, duration, {}
-        )
-        next_clip_start_time = clip_end
+    next_clip_start_time = 0
+    max_possible_clip_start = max(duration - clip_duration, 0)
+    clip_start_sec = random.uniform(0, max_possible_clip_start)
+    for i in range(clip_start_sec):
         yield {
-            'dash': dash.get_clip(clip_start, clip_end),
-            'rear': rear.get_clip(clip_start, clip_end),
-            'right': right.get_clip(clip_start, clip_end),
-            'start': clip_start,
-            'end': clip_end,
+            'dash': transform._transform(dash.get_clip(i, i+clip_duration)),
+            'rear': transform._transform(rear.get_clip(i, i+clip_duration)),
+            'right': transform._transform(right.get_clip(i, i+clip_duration)),
+            'start': i,
+            'end': i + clip_duration,
             'label': label
         }
-        if is_last_clip:
-            break
+    # while True:
+    #     clip_start, clip_end, clip_index, aug_index, is_last_clip = sampler(
+    #         next_clip_start_time, duration, {}
+    #     )
+    #     next_clip_start_time = clip_start
+    #     yield {
+    #         'dash': dash.get_clip(clip_start, clip_end),
+    #         'rear': rear.get_clip(clip_start, clip_end),
+    #         'right': right.get_clip(clip_start, clip_end),
+    #         'start': clip_start,
+    #         'end': clip_end,
+    #         'label': label
+    #     }
+    #     if is_last_clip:
+    #         break
 
 
 class City(torch.utils.data.IterableDataset):
