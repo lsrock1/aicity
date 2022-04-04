@@ -43,6 +43,8 @@ class VideoClassificationLightningModule(pytorch_lightning.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         y_hat = self.model(batch["video"])
+        print(F.softmax(y_hat, dim=1))
+        print(torch.argmax(y_hat, dim=1))
         accu = torch.sum(torch.argmax(y_hat, dim=1) == batch["label"]).item() / len(batch["label"])
         loss = F.cross_entropy(y_hat, batch["label"])
         self.log("val_loss", loss, prog_bar=True)
@@ -56,7 +58,7 @@ class VideoClassificationLightningModule(pytorch_lightning.LightningModule):
         """
         optim = torch.optim.SGD(self.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005, nesterov=True)
         # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, 1000)#
-        scheduler = torch.optim.lr_scheduler.MultiStepLR(optim, milestones=[300, 400, 450], gamma=0.1)
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(optim, milestones=[80, 100], gamma=0.1)
         #CosineAnnealingLR(optim, 200)#, gamma=0.3),
 
         return [optim], [scheduler]
@@ -65,11 +67,13 @@ class VideoClassificationLightningModule(pytorch_lightning.LightningModule):
 def train():
     classification_module = VideoClassificationLightningModule()
     data_module = DataModule()
-    trainer = pytorch_lightning.Trainer(max_epochs=500,
+    trainer = pytorch_lightning.Trainer(max_epochs=120,
         accelerator="gpu", devices=4, strategy=DDPStrategy(find_unused_parameters=False), num_sanity_val_steps=0, precision=16,
-        enable_checkpointing=True, accumulate_grad_batches=4, sync_batchnorm=True, gradient_clip_val=0.5, gradient_clip_algorithm="value",
-        resume_from_checkpoint="lightning_logs/version_22/checkpoints/epoch=27-step=280.ckpt")
-    trainer.fit(classification_module, data_module)
+        enable_checkpointing=True, accumulate_grad_batches=4, sync_batchnorm=True, gradient_clip_val=0.5, gradient_clip_algorithm="value",)
+        # resume_from_checkpoint="lightning_logs/side/checkpoints/epoch=59-step=600.ckpt")
+    # trainer.fit(classification_module, data_module)
+
+    trainer.validate(classification_module, data_module.val_dataloader(), ckpt_path='lightning_logs/rear/checkpoints/epoch=59-step=600.ckpt')
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ import os
 import random
 from collections import defaultdict
 from typing import Any, Callable, List, Optional, Tuple, Type
+from glob import glob
 
 import torch
 import torch.utils.data
@@ -12,6 +13,53 @@ from pytorchvideo.data.clip_sampling import ClipSampler
 from pytorchvideo.data.frame_video import FrameVideo
 
 from pytorchvideo.data.utils import MultiProcessSampler
+
+
+def eval_from_path(path, clip_duration, transform):
+    # ~/user_id
+    user_id = os.path.basename(path)
+    dirs = glob(os.path.join(path, '*'))
+
+    numbers = set([os.path.basename(d)[-1] for d in dirs])
+    numbers = list(numbers)
+    dirs_by_number = [[], []]
+    print(numbers)
+    for d in dirs:
+        if os.path.basename(d)[-1] == numbers[0]:
+            dirs_by_number[0].append(d)
+        else:
+            dirs_by_number[1].append(d)
+    print(dirs_by_number)
+    for idx, dirs in enumerate(dirs_by_number):
+        count = numbers[idx]
+        for d in dirs:
+            print(d)
+            if 'Dash' in d:
+                dash = FrameVideo.from_directory(d, fps=24)
+            elif 'Rear' in d:
+                rear = FrameVideo.from_directory(d, fps=24)
+            elif 'Right' in d:
+                right = FrameVideo.from_directory(d, fps=24)
+        # dash = os.path.join(path, 'DashBoard_*')[0]
+        # label = int(dash.split('_')[-1])
+        # dash = FrameVideo.from_directory(os.path.join(path, 'DashBoard_*')[0])
+        # rear = FrameVideo.from_directory(os.path.join(path, 'Rear_*')[0])
+        # right = FrameVideo.from_directory(os.path.join(path, 'Rightside_*')[0])
+        duration = min(dash.duration, rear.duration, right.duration)
+        # next_clip_start_time = 0
+        max_possible_clip_start = max(duration - clip_duration, 0)
+        max_possible_clip_start = int(max_possible_clip_start)
+        # clip_start_sec = random.uniform(0, max_possible_clip_start)
+        for i in range(max_possible_clip_start):
+            yield {
+                'dash': transform._transform(dash.get_clip(i, i+clip_duration)["video"]),
+                'rear': transform._transform(rear.get_clip(i, i+clip_duration)["video"]),
+                'right': transform._transform(right.get_clip(i, i+clip_duration)["video"]),
+                'start': i,
+                'end': i + clip_duration,
+                'user_id': user_id,
+                'count': count
+            }
 
 
 def iter_from_path(path, clip_duration, transform):
@@ -27,9 +75,9 @@ def iter_from_path(path, clip_duration, transform):
     clip_start_sec = random.uniform(0, max_possible_clip_start)
     for i in range(clip_start_sec):
         yield {
-            'dash': transform._transform(dash.get_clip(i, i+clip_duration)),
-            'rear': transform._transform(rear.get_clip(i, i+clip_duration)),
-            'right': transform._transform(right.get_clip(i, i+clip_duration)),
+            'dash': transform._transform(dash.get_clip(i, i+clip_duration)["video"]),
+            'rear': transform._transform(rear.get_clip(i, i+clip_duration)["video"]),
+            'right': transform._transform(right.get_clip(i, i+clip_duration)["video"]),
             'start': i,
             'end': i + clip_duration,
             'label': label

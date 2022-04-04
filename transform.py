@@ -19,6 +19,7 @@ import pytorch_lightning
 import pytorchvideo
 from data import City
 from glob import glob
+from collections import defaultdict
 import os
 
 side_size = 256
@@ -92,7 +93,7 @@ class DataModule(pytorch_lightning.LightningDataModule):
     # Dataset configuration
     _DATA_PATH = '/home/vitallab/ssd/vitallab/frames24'
     _SKIP_CLASS = 18
-    _TARGET_VIEW = [0, ]
+    _TARGET_VIEW = [1, ]
     _CLIP_DURATION = (num_frames * sampling_rate)/frames_per_second  # Duration of sampled clip for each video
     _BATCH_SIZE = 4
     _NUM_WORKERS = 8  # Number of parallel processes fetching data
@@ -112,6 +113,7 @@ class DataModule(pytorch_lightning.LightningDataModule):
             # if len(os.listdir(path)) == 0:
             assert len(os.listdir(path)) > 0, "No frames in {}".format(path)
             dirs = path.split('/')
+            # print(path)
             user_id, action_number, view = dirs[-3:]
             # print(user_id)
             # print(len(user_id.split('_')))
@@ -120,6 +122,8 @@ class DataModule(pytorch_lightning.LightningDataModule):
             label = int(label)
             if label == self._SKIP_CLASS: continue
             if self._VIEW_MAPPING[view] not in self._TARGET_VIEW: continue
+            # if int(action_number) > 9:
+            #     print(action_number)
             info.append(
                 (
                     path, 
@@ -130,11 +134,20 @@ class DataModule(pytorch_lightning.LightningDataModule):
                 )
             )
         info = sorted(info, key= lambda x: x[0])
+        
         if split == 'train':
             info = info[:int(len(info) * 0.8)]
         else:
             info = info[int(len(info) * 0.8):]
         print(len(info))
+        viz = defaultdict(int)
+        viz_2 = defaultdict(int)
+        for v in info:
+            viz[v[1]['label']] += 1
+            viz_2[v[1]['view']] += 1
+        print(viz)
+        print(viz_2)
+        # print(info)
         # count = {}
         # for i in range(len(info)):
         #     count[info[i][1]['label']] = count.get(info[i][1]['label'], 0) + 1
