@@ -27,7 +27,9 @@ def make_dir(path):
 
 
 def main():
-    videos = glob('2022/*/*/*.MP4')
+    if not os.path.exists('dataset/frames24'):
+        os.makedirs('dataset/frames24')
+    videos = glob('dataset/2022/*/*/*.MP4')
     for video in tqdm(videos):
 
         save_dir = make_dir(video)
@@ -35,11 +37,11 @@ def main():
         cmd = f'ffmpeg -i {video} -vf "scale=455:256,fps=24" {p}'
         os.system(cmd)
 
-    csvs = glob('2022/*/*/*.csv')
+    csvs = glob('dataset/2022/*/*/*.csv')
     for c in csvs:
         shutil.copy(c, c.replace('2022', 'frames24'))
 
-    annotations = glob('frames24/*/*/*.csv')
+    annotations = glob('dataset/frames24/*/*/*.csv')
     
     with multiprocessing.Pool(processes=8) as pool:
         for _ in tqdm(pool.imap_unordered(annotation, annotations), total=len(annotations)):

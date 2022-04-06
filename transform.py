@@ -91,7 +91,7 @@ transform_train = Compose(
 class DataModule(pytorch_lightning.LightningDataModule):
 
     # Dataset configuration
-    _DATA_PATH = '/home/vitallab/ssd/vitallab/frames24'
+    _DATA_PATH = 'dataset/frames24'
     _SKIP_CLASS = 18
     _TARGET_VIEW = [1, ]
     _CLIP_DURATION = (num_frames * sampling_rate)/frames_per_second  # Duration of sampled clip for each video

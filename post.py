@@ -26,8 +26,6 @@ def main():
                         cleaned[-1][0] = label
                     
                 cleaned.append([label, start, end])
-            # print(len(cleaned))
-
             
             # merge
             phase_2_cleaned = []
@@ -46,7 +44,7 @@ def main():
             for idx in range(2, len(phase_2_cleaned)):
                 prev_duration = duration(phase_2_cleaned[idx-2])
                 post_duration = duration(phase_2_cleaned[idx])
-                print(results)
+
                 if prev_duration > 2 and post_duration > 2 and phase_2_cleaned[idx-2][0] == phase_2_cleaned[idx][0] and post_duration + prev_duration > duration(phase_2_cleaned[idx-1]):
                     results.pop(-1)
                     _, start, _ = results.pop(-1)

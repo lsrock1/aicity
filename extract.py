@@ -10,7 +10,7 @@ import torch.nn.functional as F
 
 def read_video_ids():
     video_id_by_user_id = {}
-    with open('../2022/A2/video_ids.csv') as f:
+    with open('dataset/2022/A2/video_ids.csv') as f:
         for idx, line in enumerate(f):
             if idx == 0: continue
             line = line.strip().split(',')
@@ -23,6 +23,9 @@ def read_video_ids():
 
 @torch.no_grad()
 def main():
+    if not os.path.exists('extracted'):
+        os.mkdir('extracted')
+
     video_id_by_user_id = read_video_ids()
     dash = VideoClassificationLightningModule()
     print(dash.model.blocks[6].proj.weight[0])
@@ -44,7 +47,7 @@ def main():
     device0 = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     device1 = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
     device2 = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
-    dirs = glob(os.path.join('/home/vitallab/ssd/vitallab/frames24/A2/*'))
+    dirs = glob(os.path.join('dataset/frames24/A2/*'))
     results = defaultdict(list)
 
     dash = dash.to(device0)
@@ -63,7 +66,7 @@ def main():
                 if file != None:
                     file.close()
                 video_id = video_id_by_user_id[(data['user_id'], data['count'])]
-                file = open(f'/home/vitallab/ssd/vitallab/ar/{video_id}.txt', 'w')
+                file = open(f'extracted/{video_id}.txt', 'w')
                 results = []
             # print('dash index', data['dash_index'])
             # print('rear index', data['rear_index'])
@@ -90,12 +93,6 @@ def main():
             # results[data['user_id'] + '_' + data['count']].append(
             #     (torch.argmax(dash_re, dim=1).item(), torch.argmax(rear_re, dim=1).item(), torch.argmax(right_re, dim=1).item(), data['start'], data['end']))
             print(f'{video_id} {index} {start} {start+1}')
-        # p = data['user_id'] + '_' + data['count']
-        # with open(f'/home/vitallab/ssd/vitallab/ar/{p}.txt', 'w') as f:
-        #     for k in results[p]:
-        #         f.write(f'{k[0]} {k[1]} {k[2]} {k[3]}\n')
-                # for i in v:
-                #     f.write('\t'.join(map(str, i)) + '\n')
 
 
 if __name__ == '__main__':
