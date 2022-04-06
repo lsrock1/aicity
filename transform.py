@@ -93,7 +93,7 @@ class DataModule(pytorch_lightning.LightningDataModule):
     # Dataset configuration
     _DATA_PATH = 'dataset/frames24'
     _SKIP_CLASS = 18
-    _TARGET_VIEW = [0, ]
+    # _TARGET_VIEW = [0, ]
     _CLIP_DURATION = (num_frames * sampling_rate)/frames_per_second  # Duration of sampled clip for each video
     _BATCH_SIZE = 4
     _NUM_WORKERS = 8  # Number of parallel processes fetching data
@@ -102,6 +102,9 @@ class DataModule(pytorch_lightning.LightningDataModule):
         'Rear': 1,
         'Rightside': 2
     }
+    def __init__(self, target_view):
+        super().__init__()
+        self._TARGET_VIEW = [target_view]
 
     def load_dataset_(self, split='train'):
         # user_id_number/action_number/view

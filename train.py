@@ -8,6 +8,9 @@ from pytorch_lightning.strategies import DDPStrategy
 import pytorchvideo.models as models
 
 from transform import DataModule
+import argparse
+import logging
+import sys
 
 
 class VideoClassificationLightningModule(pytorch_lightning.LightningModule):
@@ -69,10 +72,15 @@ class VideoClassificationLightningModule(pytorch_lightning.LightningModule):
 
 
 def train():
+    parser = argparse.ArgumentParser(description='training')
+    # view 0: dashboard, 1: rear, 2: right
+    parser.add_argument("--view", type=int, required=True)
+    args = parser.parse_args()
+
     classification_module = VideoClassificationLightningModule()
-    data_module = DataModule()
+    data_module = DataModule(args.view)
     trainer = pytorch_lightning.Trainer(max_epochs=120,
-        accelerator="gpu", devices=4, strategy=DDPStrategy(find_unused_parameters=False), num_sanity_val_steps=0, precision=16,
+        accelerator="gpu", devices=2, strategy=DDPStrategy(find_unused_parameters=False), num_sanity_val_steps=0, precision=16,
         enable_checkpointing=True, accumulate_grad_batches=4, sync_batchnorm=True, gradient_clip_val=5, gradient_clip_algorithm="value",)
         # resume_from_checkpoint="lightning_logs/version_36/checkpoints/epoch=17-step=216.ckpt")
     trainer.fit(classification_module, data_module)
@@ -80,8 +88,7 @@ def train():
 
 
 if __name__ == "__main__":
-    import logging
-    import sys
+    
 
     #Creating and Configuring Logger
 

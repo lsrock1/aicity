@@ -17,7 +17,7 @@ def make_dir(path):
         view_name = 'Rightside'    
     if view_name == 'Rearview':
         view_name = 'Rear'
-    video_dir = video_name.split('_')[0] + '_' + video_name[-5]
+    video_dir = view_name + '_' + video_name[-5]
     basedir = os.path.dirname(path)
     basedir = basedir.replace('2022', 'frames24')
     basedir = os.path.join(basedir, video_dir)
