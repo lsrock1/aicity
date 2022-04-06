@@ -10,7 +10,6 @@ import pytorchvideo.models as models
 from transform import DataModule
 import argparse
 import logging
-import sys
 
 
 class VideoClassificationLightningModule(pytorch_lightning.LightningModule):
