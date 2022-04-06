@@ -93,7 +93,7 @@ class DataModule(pytorch_lightning.LightningDataModule):
     # Dataset configuration
     _DATA_PATH = 'dataset/frames24'
     _SKIP_CLASS = 18
-    _TARGET_VIEW = [1, ]
+    _TARGET_VIEW = [0, ]
     _CLIP_DURATION = (num_frames * sampling_rate)/frames_per_second  # Duration of sampled clip for each video
     _BATCH_SIZE = 4
     _NUM_WORKERS = 8  # Number of parallel processes fetching data

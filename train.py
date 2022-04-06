@@ -73,8 +73,8 @@ def train():
     data_module = DataModule()
     trainer = pytorch_lightning.Trainer(max_epochs=120,
         accelerator="gpu", devices=4, strategy=DDPStrategy(find_unused_parameters=False), num_sanity_val_steps=0, precision=16,
-        enable_checkpointing=True, accumulate_grad_batches=4, sync_batchnorm=True, gradient_clip_val=5, gradient_clip_algorithm="value",
-        resume_from_checkpoint="lightning_logs/version_36/checkpoints/epoch=17-step=216.ckpt")
+        enable_checkpointing=True, accumulate_grad_batches=4, sync_batchnorm=True, gradient_clip_val=5, gradient_clip_algorithm="value",)
+        # resume_from_checkpoint="lightning_logs/version_36/checkpoints/epoch=17-step=216.ckpt")
     trainer.fit(classification_module, data_module)
     # trainer.validate(classification_module, data_module.val_dataloader(), ckpt_path='lightning_logs/rear/checkpoints/epoch=59-step=600.ckpt')
 
