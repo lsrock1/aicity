@@ -27,6 +27,7 @@ class VideoClassificationLightningModule(pytorch_lightning.LightningModule):
         # print(len(batch['video']))
         # The model expects a video tensor of shape (B, C, T, H, W), which is the
         # format provided by the dataset
+        self.model.train()
         y_hat = self.model(batch["video"])
 
         # Compute cross entropy loss, loss.backwards will be called behind the scenes
@@ -42,9 +43,12 @@ class VideoClassificationLightningModule(pytorch_lightning.LightningModule):
         return {'loss': loss, 'accu': accu, 'log': {'train_loss': loss, 'train_accu': accu}}
 
     def validation_step(self, batch, batch_idx):
+        self.model.eval()
         y_hat = self.model(batch["video"])
-        print(F.softmax(y_hat, dim=1))
-        print(torch.argmax(y_hat, dim=1))
+        # print(torch.argmax(y_hat, dim=1) == batch["label"])
+        # print(torch.argmax(y_hat, dim=1), batch['label'])
+        # print(F.softmax(y_hat, dim=1))
+        # print(torch.argmax(y_hat, dim=1))
         accu = torch.sum(torch.argmax(y_hat, dim=1) == batch["label"]).item() / len(batch["label"])
         loss = F.cross_entropy(y_hat, batch["label"])
         self.log("val_loss", loss, prog_bar=True)
@@ -69,11 +73,10 @@ def train():
     data_module = DataModule()
     trainer = pytorch_lightning.Trainer(max_epochs=120,
         accelerator="gpu", devices=4, strategy=DDPStrategy(find_unused_parameters=False), num_sanity_val_steps=0, precision=16,
-        enable_checkpointing=True, accumulate_grad_batches=4, sync_batchnorm=True, gradient_clip_val=0.5, gradient_clip_algorithm="value",)
-        # resume_from_checkpoint="lightning_logs/side/checkpoints/epoch=59-step=600.ckpt")
-    # trainer.fit(classification_module, data_module)
-
-    trainer.validate(classification_module, data_module.val_dataloader(), ckpt_path='lightning_logs/rear/checkpoints/epoch=59-step=600.ckpt')
+        enable_checkpointing=True, accumulate_grad_batches=4, sync_batchnorm=True, gradient_clip_val=5, gradient_clip_algorithm="value",
+        resume_from_checkpoint="lightning_logs/version_36/checkpoints/epoch=17-step=216.ckpt")
+    trainer.fit(classification_module, data_module)
+    # trainer.validate(classification_module, data_module.val_dataloader(), ckpt_path='lightning_logs/rear/checkpoints/epoch=59-step=600.ckpt')
 
 
 if __name__ == "__main__":

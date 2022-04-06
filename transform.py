@@ -60,7 +60,7 @@ transform_val =  ApplyTransformToKey(
             Lambda(lambda x: x/255.0),
             Normalize(mean, std),
             ShortSideScale(
-                size=side_size
+                size=256
             ),
             CenterCrop((244, 434)),
             PackPathway()
@@ -135,9 +135,9 @@ class DataModule(pytorch_lightning.LightningDataModule):
             )
         info = sorted(info, key= lambda x: x[0])
         
-        if split == 'train':
-            info = info[:int(len(info) * 0.8)]
-        else:
+        if split != 'train':
+        #     info = info[:int(len(info) * 0.8)]
+        # else:
             info = info[int(len(info) * 0.8):]
         print(len(info))
         viz = defaultdict(int)

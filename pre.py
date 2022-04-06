@@ -10,24 +10,6 @@ from datetime import datetime
 import shutil
 
 
-def read_and_save(path):
-    vidcap = cv2.VideoCapture(path)
-    video_name = os.path.basename(path)
-    video_dir = video_name.split('_')[0] + '_' + video_name[-5]
-    basedir = os.path.dirname(path)
-    basedir = basedir.replace('2022', 'frames')
-    basedir = os.path.join(basedir, video_dir)
-    if not os.path.exists(basedir):
-        os.makedirs(basedir)
-    success,image = vidcap.read()
-    count = 0
-    while success:
-        image = cv2.resize(image, (455, 256), interpolation=cv2.INTER_AREA)
-        cv2.imwrite(os.path.join(basedir, f'{count}.png'), image)     # save frame as JPEG file      
-        success,image = vidcap.read()
-        count += 1
-
-
 def make_dir(path):
     video_name = os.path.basename(path)
     view_name = video_name.split('_')[0]
@@ -45,22 +27,19 @@ def make_dir(path):
 
 
 def main():
-    # videos = glob('/home/vitallab/ssd/vitallab/2022/*/*/*.MP4')
-    # for video in tqdm(videos):
+    videos = glob('2022/*/*/*.MP4')
+    for video in tqdm(videos):
 
-    #     save_dir = make_dir(video)
-    #     p = os.path.join(save_dir, '%d.png')
-    #     cmd = f'ffmpeg -i {video} -vf "scale=455:256,fps=24" {p}'
-    #     os.system(cmd)
+        save_dir = make_dir(video)
+        p = os.path.join(save_dir, '%d.png')
+        cmd = f'ffmpeg -i {video} -vf "scale=455:256,fps=24" {p}'
+        os.system(cmd)
 
-    # csvs = glob('/home/vitallab/ssd/vitallab/2022/*/*/*.csv')
-    # for c in csvs:
-    #     shutil.copy(c, c.replace('2022', 'frames24'))
-    # with multiprocessing.Pool(processes=8) as pool:
-    #     for _ in tqdm(pool.imap_unordered(read_and_save, videos), total=len(videos)):
-    #         pass
+    csvs = glob('2022/*/*/*.csv')
+    for c in csvs:
+        shutil.copy(c, c.replace('2022', 'frames24'))
 
-    annotations = glob('/home/vitallab/ssd/vitallab/frames24/*/*/*.csv')
+    annotations = glob('frames24/*/*/*.csv')
     
     with multiprocessing.Pool(processes=8) as pool:
         for _ in tqdm(pool.imap_unordered(annotation, annotations), total=len(annotations)):

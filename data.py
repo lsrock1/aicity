@@ -51,13 +51,19 @@ def eval_from_path(path, clip_duration, transform):
         max_possible_clip_start = int(max_possible_clip_start)
         # clip_start_sec = random.uniform(0, max_possible_clip_start)
         for i in range(max_possible_clip_start):
+            dash_data = dash.get_clip(i, i+clip_duration)
+            rear_data = rear.get_clip(i, i+clip_duration)
+            right_data = right.get_clip(i, i+clip_duration)
             yield {
-                'dash': transform._transform(dash.get_clip(i, i+clip_duration)["video"]),
-                'rear': transform._transform(rear.get_clip(i, i+clip_duration)["video"]),
-                'right': transform._transform(right.get_clip(i, i+clip_duration)["video"]),
+                'dash': transform._transform(dash_data['video']),
+                'rear': transform._transform(rear_data['video']),
+                'right': transform._transform(right_data['video']),
+                'dash_index': dash_data['frame_indices'],
+                'rear_index': rear_data['frame_indices'],
+                'right_index': right_data['frame_indices'],
                 'start': i,
                 'end': i + clip_duration,
-                'user_id': user_id,
+                'user_id': user_id.lower(),
                 'count': count
             }
 
@@ -229,6 +235,7 @@ class City(torch.utils.data.IterableDataset):
         # print(clip_end)
         # Only load the clip once and reuse previously stored clip if there are multiple
         # views for augmentations to perform on the same clip.
+        # print(clip_start, clip_end)
         if aug_index == 0:
             self._loaded_clip = video.get_clip(clip_start, clip_end, self._frame_filter)
         # print(self._loaded_clip['video'].shape)
