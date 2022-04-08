@@ -84,7 +84,9 @@ def main():
     alloc = partial(func, predictor=predictor)
     multiprocessing.Pool(multiprocessing.cpu_count()).map(alloc, paths)
     # for path in paths:
-        
+
+    # paths = glob('dataset/frames24/A2/*/*')
+    # multiprocessing.Pool(multiprocessing.cpu_count()).map(alloc, paths)
 
 
 if __name__ == '__main__':

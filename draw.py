@@ -8,11 +8,16 @@ def main():
     paths = glob('dataset/bboxes/A1/*/*/*')
     
     for path in paths:
+        if '24491_1' not in path: continue
         if not os.path.exists(path.replace('bboxes', 'bboxes_draw')):
             os.makedirs(path.replace('bboxes', 'bboxes_draw'))
         for box in glob(os.path.join(path, '*.npy')):
             img = cv2.imread(box.replace('bboxes', 'frames24').replace('.npy', '.png'))
-            x1, y1, x2, y2 = np.load(box)[0]
+            try:
+                x1, y1, x2, y2 = np.load(box)[0]
+            except:
+                print(box)
+                break
             x1 = int(x1)
             y1 = int(y1)
             x2 = int(x2)

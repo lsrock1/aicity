@@ -213,7 +213,7 @@ class City(torch.utils.data.IterableDataset):
             self._loaded_clip["video"],
             self._loaded_clip["frame_indices"],
         )
-        print(frame_indices)
+        
         self._next_clip_start_time = clip_end
 
         if is_last_clip:
@@ -292,13 +292,29 @@ class CityDetection(City):
             self._loaded_clip["video"],
             self._loaded_clip["frame_indices"],
         )
-        box_path = video._video_frame_to_path(frame_indices[len(frame_indices)//2])
+        
         self._next_clip_start_time = clip_end
 
         if is_last_clip:
             self._loaded_video = None
             self._next_clip_start_time = 0.0
-        box = np.load(box_path)
+        index = len(frame_indices)//2
+        while True:
+            if not os.path.exists(video._video_frame_to_path(frame_indices[index]).replace('frames24', 'bboxes').replace('png', 'npy')):
+                index -= 1
+                if index < 0:
+                    assert False
+            else:
+                box_path = video._video_frame_to_path(frame_indices[index]).replace('frames24', 'bboxes').replace('png', 'npy')
+                box = np.load(box_path)
+                if len(box) == 0:
+                    index -= 1
+                    if index < 0:
+                        assert False
+                else:
+                    break
+            
+        
         # Merge unique labels from each frame into clip label.
         # labels_by_frame = [
         #     self._labels[video_index][i]
