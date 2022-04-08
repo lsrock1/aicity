@@ -6,6 +6,7 @@ import random
 from collections import defaultdict
 from typing import Any, Callable, List, Optional, Tuple, Type
 from glob import glob
+import numpy as np
 
 import torch
 import torch.utils.data
@@ -24,6 +25,8 @@ def eval_from_path(path, clip_duration, transform):
     numbers = list(numbers)
     dirs_by_number = [[], []]
     print(numbers)
+    if len(numbers) == 1:
+        dirs_by_number.pop(-1)
     for d in dirs:
         if os.path.basename(d)[-1] == numbers[0]:
             dirs_by_number[0].append(d)
@@ -106,18 +109,6 @@ def iter_from_path(path, clip_duration, transform):
 
 
 class City(torch.utils.data.IterableDataset):
-    """
-    Action recognition video dataset for
-    `Charades <https://prior.allenai.org/projects/charades>`_ stored as image frames.
-
-    This dataset handles the parsing of frames, loading and clip sampling for the
-    videos. All io is done through :code:`iopath.common.file_io.PathManager`, enabling
-    non-local storage uri's to be used.
-    """
-
-    # Number of classes represented by this dataset's annotated labels.
-    NUM_CLASSES = 18
-
     def __init__(
         self,
         info: List,
@@ -271,3 +262,110 @@ class City(torch.utils.data.IterableDataset):
     def __iter__(self):
         return self
 
+
+class CityUnlabel(torch.utils.data.IterableDataset):
+    def __init__(
+        self,
+        unlabeled_videos: List,
+        clip_sampler: ClipSampler,
+        transform_weak,
+        transform_strong,
+        video_sampler: Type[torch.utils.data.Sampler] = torch.utils.data.RandomSampler,
+        video_path_prefix: str = "",
+        frames_per_clip: Optional[int] = None,
+    ) -> None:
+        self._path_to_videos = unlabeled_videos
+        self._transform_weak = transform_weak
+        self._transform_strong = transform_strong
+        self._clip_sampler = clip_sampler
+        self._video_sampler = video_sampler(self._path_to_videos)
+        self._video_sampler_iter = None  # Initialized on first call to self.__next__()
+        self._frame_filter = (
+            functools.partial(
+                CityUnlabel._sample_clip_frames,
+                frames_per_clip=frames_per_clip,
+            )
+            if frames_per_clip is not None
+            else None
+        )
+
+        # Depending on the clip sampler type, we may want to sample multiple clips
+        # from one video. In that case, we keep the store video, label and previous sampled
+        # clip time in these variables.
+        self._loaded_video = None
+        self._loaded_clip = None
+        self._next_clip_start_time = 0.0
+
+
+    @staticmethod
+    def _sample_clip_frames(
+        frame_indices: List[int], frames_per_clip: int
+    ) -> List[int]:
+        """
+        Args:
+            frame_indices (list): list of frame indices.
+            frames_per+clip (int): The number of frames per clip to sample.
+
+        Returns:
+            (list): Outputs a subsampled list with num_samples frames.
+        """
+        num_frames = len(frame_indices)
+        indices = torch.linspace(0, num_frames - 1, frames_per_clip)
+        indices = torch.clamp(indices, 0, num_frames - 1).long()
+
+        return [frame_indices[idx] for idx in indices]
+
+    @property
+    def video_sampler(self) -> torch.utils.data.Sampler:
+        return self._video_sampler
+
+    def __next__(self) -> dict:
+        if not self._video_sampler_iter:
+            # Setup MultiProcessSampler here - after PyTorch DataLoader workers are spawned.
+            self._video_sampler_iter = iter(MultiProcessSampler(self._video_sampler))
+
+        if self._loaded_video:
+            video, video_index = self._loaded_video
+        else:
+            video_index = next(self._video_sampler_iter)
+            path_to_video_frames = self._path_to_videos[video_index]
+            video = FrameVideo.from_directory(path_to_video_frames, multithreaded_io=False, fps=24)
+            self._loaded_video = (video, video_index)
+
+        clip_start, clip_end, clip_index, aug_index, is_last_clip = self._clip_sampler(
+            self._next_clip_start_time, video.duration, {}
+        )
+        # print(clip_start)
+        # print(clip_end)
+        # Only load the clip once and reuse previously stored clip if there are multiple
+        # views for augmentations to perform on the same clip.
+        # print(clip_start, clip_end)
+        if aug_index == 0:
+            self._loaded_clip = video.get_clip(clip_start, clip_end, self._frame_filter)
+        # print(self._loaded_clip['video'].shape)
+        frames, frame_indices = (
+            self._loaded_clip["video"],
+            self._loaded_clip["frame_indices"],
+        )
+        self._next_clip_start_time = clip_end
+
+        if is_last_clip:
+            self._loaded_video = None
+            self._next_clip_start_time = 0.0
+
+        # Merge unique labels from each frame into clip label.
+        # labels_by_frame = [
+        #     self._labels[video_index][i]
+        #     for i in range(min(frame_indices), max(frame_indices) + 1)
+        # ]
+        sample_dict = {
+            "video": frames,
+            'video_strong': frames
+        }
+        # if self._transform is not None:
+        sample_dict = self._transform_strong(self._transform_weak(sample_dict))
+
+        return sample_dict
+
+    def __iter__(self):
+        return self

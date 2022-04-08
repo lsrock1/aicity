@@ -1,3 +1,4 @@
+from train_ssl import SSL
 from train import VideoClassificationLightningModule
 from glob import glob
 from data import eval_from_path
@@ -25,22 +26,22 @@ def read_video_ids():
 def main():
     if not os.path.exists('extracted'):
         os.mkdir('extracted')
-
+    model = VideoClassificationLightningModule()
     video_id_by_user_id = read_video_ids()
-    dash = VideoClassificationLightningModule()
-    print(dash.model.blocks[6].proj.weight[0])
-    dash = dash.load_from_checkpoint("lightning_logs/dash_swa/checkpoints/epoch=60-step=732.ckpt", map_location='cpu')
+    dash = SSL(model)
+    # print(dash.model.blocks[6].proj.weight[0])
+    dash = dash.load_from_checkpoint("lightning_logs/dash_ssl/checkpoints/epoch=59-step=1440.ckpt", map_location='cpu')
     dash.eval()
     dash.freeze()
-    print(dash.model.blocks[6].proj.weight[0])
+    # print(dash.model.blocks[6].proj.weight[0])
 
-    rear = VideoClassificationLightningModule()
-    rear = rear.load_from_checkpoint("lightning_logs/rear_swa/checkpoints/epoch=60-step=732.ckpt", map_location='cpu')
+    rear = SSL(model)
+    rear = rear.load_from_checkpoint("lightning_logs/rear_ssl/checkpoints/epoch=59-step=1440.ckpt", map_location='cpu')
     rear.eval()
     rear.freeze()
 
-    right = VideoClassificationLightningModule()
-    right = right.load_from_checkpoint("lightning_logs/side_swa/checkpoints/epoch=60-step=732.ckpt", map_location='cpu')
+    right = SSL(model)
+    right = right.load_from_checkpoint("lightning_logs/side_ssl/checkpoints/epoch=59-step=1440.ckpt", map_location='cpu')
     right.eval()
     right.freeze()
 

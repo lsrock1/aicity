@@ -15,6 +15,7 @@ def main():
     agg = open('final.txt', 'w')
     for i in txt:
         video_id = i[-5]
+        if video_id == '0': video_id = '10'
         with open(i) as f:
             lines = f.readlines()
             for line in lines:

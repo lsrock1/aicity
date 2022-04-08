@@ -12,12 +12,15 @@ from torchvision.transforms import (
     Lambda,
     RandomCrop,
     CenterCrop,
-    RandomHorizontalFlip
+    FiveCrop,
+    ToTensor,
+    RandomHorizontalFlip,
+    ColorJitter
 )
 from pytorchvideo.data import LabeledVideoDataset
 import pytorch_lightning
 import pytorchvideo
-from data import City
+from data import City, CityUnlabel
 from glob import glob
 from collections import defaultdict
 import os
@@ -68,6 +71,24 @@ transform_val =  ApplyTransformToKey(
     ),
 )
 
+transform_infer =  ApplyTransformToKey(
+    key="video",
+    transform=Compose(
+        [
+            UniformTemporalSubsample(num_frames),
+            Lambda(lambda x: x/255.0),
+            Normalize(mean, std),
+            ShortSideScale(
+                size=256
+            ),
+            # CenterCrop((244, 434)),
+            FiveCrop((244, 434)),
+            Lambda(lambda crops: torch.stack([crop for crop in crops], dim=-1)),
+            PackPathway()
+        ]
+    ),
+)
+
 transform_train = Compose(
             [
             ApplyTransformToKey(
@@ -79,7 +100,50 @@ transform_train = Compose(
                     Normalize(mean, std),
                     ShortSideScale(256),
                     RandomCrop((244, 434)),
-                    RandomHorizontalFlip(p=0.5),
+                    # RandomHorizontalFlip(p=0.5),
+                    PackPathway()
+                  ]
+                ),
+              ),
+            ]
+        )
+
+
+transform_strong = Compose(
+            [
+            ApplyTransformToKey(
+              key="video_strong",
+              transform=Compose(
+                  [
+                    UniformTemporalSubsample(num_frames),
+                    Lambda(lambda x: x / 255.0),
+                    Normalize(mean, std),
+                    ShortSideScale(256),
+                    RandomCrop((244, 434)),
+                    Lambda(lambda crops: crops.transpose(0,1)),
+                    ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),
+                    # RandomHorizontalFlip(p=0.5),
+                    Lambda(lambda crops: crops.transpose(0,1)),
+                    PackPathway()
+                  ]
+                ),
+              ),
+            ]
+        )
+
+
+transform_train = Compose(
+            [
+            ApplyTransformToKey(
+              key="video",
+              transform=Compose(
+                  [
+                    UniformTemporalSubsample(num_frames),
+                    Lambda(lambda x: x / 255.0),
+                    Normalize(mean, std),
+                    ShortSideScale(256),
+                    RandomCrop((244, 434)),
+                    # RandomHorizontalFlip(p=0.5),
                     PackPathway()
                   ]
                 ),
@@ -187,6 +251,37 @@ class DataModule(pytorch_lightning.LightningDataModule):
             batch_size=self._BATCH_SIZE,
             num_workers=self._NUM_WORKERS,
         )
+
+
+class DataUnlabel(DataModule):
+    def train_dataloader(self):
+        """
+        Create the Kinetics train partition from the list of video labels
+        in {self._DATA_PATH}/train
+        """
+        labeled = torch.utils.data.DataLoader(
+            self.load_dataset_(),
+            batch_size=self._BATCH_SIZE,
+            num_workers=self._NUM_WORKERS,
+        )
+        videos = glob(os.path.join(self._DATA_PATH, "A2/*/*"))
+        view_videos = []
+
+        for video in videos:
+            view = video.split('/')[-1].split('_')[0]
+            view = self._VIEW_MAPPING[view]
+            if view in self._TARGET_VIEW:
+                view_videos.append(video)
+        unlabeled = torch.utils.data.DataLoader(
+            CityUnlabel(
+                view_videos,
+                pytorchvideo.data.make_clip_sampler("random", self._CLIP_DURATION),
+                transform_train, transform_strong
+            ),
+            batch_size=self._BATCH_SIZE,
+            num_workers=self._NUM_WORKERS,
+        )
+        return [labeled, unlabeled]
 
 
 if __name__ == '__main__':
