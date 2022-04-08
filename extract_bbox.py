@@ -9,6 +9,7 @@ import os
 from glob import glob
 import cv2
 from functools import partial
+from tqdm import tqdm
 
 # This method takes in an image and generates the bounding boxes for people in the image.
 def get_person_bboxes(inp_img, predictor):
@@ -38,6 +39,11 @@ def get_iou(bb1, bb2):
 
 
 def func(path, predictor):
+    # cfg = get_cfg()
+    # cfg.merge_from_file(model_zoo.get_config_file("COCO-Detection/faster_rcnn_R_50_FPN_3x.yaml"))
+    # cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.55  # set threshold for this model
+    # cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url("COCO-Detection/faster_rcnn_R_50_FPN_3x.yaml")
+    # predictor = DefaultPredictor(cfg)
     imgs = sorted(glob(os.path.join(path, '*.png')), key=lambda x: int(x.split('/')[-1].split('.')[0]))
     if not os.path.exists(path.replace('frames24', 'bboxes')):
         os.makedirs(path.replace('frames24', 'bboxes'))
@@ -45,6 +51,9 @@ def func(path, predictor):
     
     for img in imgs:
         img_path = img
+        if os.path.exists(img_path.replace('frames24', 'bboxes')[:-4] + '.npy'):
+            continue
+        
         img = cv2.imread(img)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         # img = np.transpose(img, (2, 0, 1))
@@ -81,8 +90,13 @@ def main():
     multiprocessing.set_start_method('spawn')
 
     paths = glob('dataset/frames24/A1/*_*_*_*/*/*')
+    paths = sorted(paths)
+    paths = [p for p in paths if 'Rear' in p]
     alloc = partial(func, predictor=predictor)
-    multiprocessing.Pool(multiprocessing.cpu_count()).map(alloc, paths)
+    # multiprocessing.Pool(multiprocessing.cpu_count()).map(alloc, paths)
+    with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
+        for _ in tqdm(pool.imap_unordered(alloc, paths), total=len(paths)):
+            pass
     # for path in paths:
 
     # paths = glob('dataset/frames24/A2/*/*')
