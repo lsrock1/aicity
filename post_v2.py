@@ -63,10 +63,15 @@ def main():
                 else:
                     results.append(current)
             
+            results = [list(r) for r in results if r[0] != 0 and int(r[2]) - int(r[1]) > 3]
+
             final_merge = results[:1]
 
             for line in tqdm(results[1:]):
+                # print(float(line[1]) - float(final_merge[-1][2]))
+                # print(line[0], final_merge[-1][0])
                 if line[0] == final_merge[-1][0] and float(line[1]) - float(final_merge[-1][2]) < 8:
+                    print('merging')
                     final_merge[-1][2] = line[2]
                 else:
                     final_merge.append(line)

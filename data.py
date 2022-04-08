@@ -15,6 +15,12 @@ from pytorchvideo.data.frame_video import FrameVideo
 
 from pytorchvideo.data.utils import MultiProcessSampler
 
+from pytorchvideo.transforms.functional import (
+    random_crop_with_boxes,
+    uniform_crop_with_boxes,
+)
+from transform import PackPathway
+
 
 def eval_from_path(path, clip_duration, transform):
     # ~/user_id
@@ -118,30 +124,6 @@ class City(torch.utils.data.IterableDataset):
         video_path_prefix: str = "",
         frames_per_clip: Optional[int] = None,
     ) -> None:
-        """
-        Args:
-            data_path (str): Path to the data file. This file must be a space
-                separated csv with the format: (original_vido_id video_id frame_id
-                path_labels)
-
-            clip_sampler (ClipSampler): Defines how clips should be sampled from each
-                video. See the clip sampling documentation for more information.
-
-            video_sampler (Type[torch.utils.data.Sampler]): Sampler for the internal
-                video container. This defines the order videos are decoded and,
-                if necessary, the distributed split.
-
-            transform (Optional[Callable]): This callable is evaluated on the clip output before
-                the clip is returned. It can be used for user defined preprocessing and
-                augmentations on the clips. The clip output format is described in __next__().
-
-            video_path_prefix (str): prefix path to add to all paths from data_path.
-
-            frames_per_clip (Optional[int]): The number of frames per clip to sample.
-        """
-
-        # torch._C._log_api_usage_once("PYTORCHVIDEO.dataset.Charades.__init__")
-
         self._transform = transform
         self._clip_sampler = clip_sampler
         (
@@ -159,9 +141,6 @@ class City(torch.utils.data.IterableDataset):
             else None
         )
 
-        # Depending on the clip sampler type, we may want to sample multiple clips
-        # from one video. In that case, we keep the store video, label and previous sampled
-        # clip time in these variables.
         self._loaded_video = None
         self._loaded_clip = None
         self._next_clip_start_time = 0.0
@@ -223,7 +202,7 @@ class City(torch.utils.data.IterableDataset):
             self._next_clip_start_time, video.duration, {}
         )
         # print(clip_start)
-        # print(clip_end)
+        # print(clip_index)
         # Only load the clip once and reuse previously stored clip if there are multiple
         # views for augmentations to perform on the same clip.
         # print(clip_start, clip_end)
@@ -234,6 +213,7 @@ class City(torch.utils.data.IterableDataset):
             self._loaded_clip["video"],
             self._loaded_clip["frame_indices"],
         )
+        print(frame_indices)
         self._next_clip_start_time = clip_end
 
         if is_last_clip:
@@ -263,61 +243,26 @@ class City(torch.utils.data.IterableDataset):
         return self
 
 
-class CityUnlabel(torch.utils.data.IterableDataset):
+class CityDetection(City):
     def __init__(
         self,
-        unlabeled_videos: List,
+        info: List,
+        phase: str,
         clip_sampler: ClipSampler,
-        transform_weak,
-        transform_strong,
         video_sampler: Type[torch.utils.data.Sampler] = torch.utils.data.RandomSampler,
+        transform: Optional[Callable[[dict], Any]] = None,
         video_path_prefix: str = "",
         frames_per_clip: Optional[int] = None,
     ) -> None:
-        self._path_to_videos = unlabeled_videos
-        self._transform_weak = transform_weak
-        self._transform_strong = transform_strong
-        self._clip_sampler = clip_sampler
-        self._video_sampler = video_sampler(self._path_to_videos)
-        self._video_sampler_iter = None  # Initialized on first call to self.__next__()
-        self._frame_filter = (
-            functools.partial(
-                CityUnlabel._sample_clip_frames,
-                frames_per_clip=frames_per_clip,
-            )
-            if frames_per_clip is not None
-            else None
+        super().__init__(
+            info,
+            clip_sampler,
+            video_sampler,
+            transform,
+            video_path_prefix,
+            frames_per_clip,
         )
-
-        # Depending on the clip sampler type, we may want to sample multiple clips
-        # from one video. In that case, we keep the store video, label and previous sampled
-        # clip time in these variables.
-        self._loaded_video = None
-        self._loaded_clip = None
-        self._next_clip_start_time = 0.0
-
-
-    @staticmethod
-    def _sample_clip_frames(
-        frame_indices: List[int], frames_per_clip: int
-    ) -> List[int]:
-        """
-        Args:
-            frame_indices (list): list of frame indices.
-            frames_per+clip (int): The number of frames per clip to sample.
-
-        Returns:
-            (list): Outputs a subsampled list with num_samples frames.
-        """
-        num_frames = len(frame_indices)
-        indices = torch.linspace(0, num_frames - 1, frames_per_clip)
-        indices = torch.clamp(indices, 0, num_frames - 1).long()
-
-        return [frame_indices[idx] for idx in indices]
-
-    @property
-    def video_sampler(self) -> torch.utils.data.Sampler:
-        return self._video_sampler
+        self.phase = phase
 
     def __next__(self) -> dict:
         if not self._video_sampler_iter:
@@ -347,12 +292,13 @@ class CityUnlabel(torch.utils.data.IterableDataset):
             self._loaded_clip["video"],
             self._loaded_clip["frame_indices"],
         )
+        box_path = video._video_frame_to_path(frame_indices[len(frame_indices)//2])
         self._next_clip_start_time = clip_end
 
         if is_last_clip:
             self._loaded_video = None
             self._next_clip_start_time = 0.0
-
+        box = np.load(box_path)
         # Merge unique labels from each frame into clip label.
         # labels_by_frame = [
         #     self._labels[video_index][i]
@@ -360,12 +306,27 @@ class CityUnlabel(torch.utils.data.IterableDataset):
         # ]
         sample_dict = {
             "video": frames,
-            'video_strong': frames
+            "label": self._labels[video_index],
+            "box": box,
+            "video_name": str(video_index),
+            "video_index": video_index,
+            "clip_index": clip_index,
+            "aug_index": aug_index,
         }
         # if self._transform is not None:
-        sample_dict = self._transform_strong(self._transform_weak(sample_dict))
+        sample_dict = self._transform(sample_dict)
+        if self.phase == 'train':
+            sample_dict['label'] = self._labels[video_index]
+
+        if self.phase == 'train':
+            video, box = random_crop_with_boxes(sample_dict['video'], (244, 434), sample_dict['box'])
+
+            video = PackPathway()(video)
+        else:
+            video, box = uniform_crop_with_boxes(sample_dict['video'], (244, 434), 1, sample_dict['box'])
+            video = PackPathway()(video)
+        # box = torch.cat([torch.zeros(box.shape[0],1), box], dim=1)
+        sample_dict['video'] = video
+        sample_dict['box'] = box
 
         return sample_dict
-
-    def __iter__(self):
-        return self

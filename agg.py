@@ -22,7 +22,7 @@ def main():
                 label, start, end = line.strip().split(' ')
                 # start = time.strftime('%M:%S', time.gmtime(int(start)))
                 # end = time.strftime('%M:%S', time.gmtime(int(end)))
-                if label != '0' and (int(end) - int(start) > 3):
+                if label != '0':
                     agg.write(f'{video_id} {label} {start} {end}\n')
                 # f.write(f'{video_id} {label} {start} {end}')
     agg.close()
