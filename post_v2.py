@@ -1,6 +1,7 @@
 from glob import glob
 import os
 from tqdm import tqdm
+from collections import defaultdict
 
 
 def duration(a):
@@ -17,6 +18,26 @@ def main():
             lines = f.readlines()
             prev = -1
             prev_start = 0
+
+            new_line = []
+            c = 0
+            for idx, line in enumerate(lines[::24]):
+                idx_start = idx * 24
+                idx_end = idx_start + 12
+
+                count = defaultdict(int)
+                prob_stack = defaultdict(list)
+                for l in lines[idx_start:idx_end]:
+                    video, label, start, end, prob = l.strip().split(' ')
+                    count[label] += 1
+                    prob_stack[label].append(float(prob))
+                max_label = max(count.items(), key= lambda x: x[1])[0]
+                # print(max_label)
+                prob = sum(prob_stack[max_label]) / len(prob_stack[max_label])
+                new_line.append(
+                    f'{video} {max_label} {idx} {idx+1} {prob}')
+            lines = new_line
+            print(lines)
             # cleansing
             cleaned = []
 

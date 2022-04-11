@@ -5,7 +5,7 @@ import torch.nn.functional as F
 import pytorch_lightning
 import torch.utils.data
 from pytorch_lightning.strategies import DDPStrategy
-from pytorchvideo.models.hub import slow_r50_detection
+from pytorchvideo.models.hub import slowfast_r50_detection
 from transform import DetectionModule
 import argparse
 import logging
@@ -16,27 +16,33 @@ class Detection(pytorch_lightning.LightningModule):
         super().__init__()
         # slowfast = models.create_slowfast()
         # model_name = "slowfast_r50"
-        self.model = slow_r50_detection(True)
-        self.model.detection_head.proj = nn.Linear(2048, 18)
+        self.model = slowfast_r50_detection(True)
+        self.model.detection_head.dropout.p = 0.2
+        self.model.detection_head.proj = nn.Linear(2304, 18)
+        self.model.detection_head.activation = nn.Identity()
         # self.model.blocks[6].dropout.p = 0.1
         # self.model.blocks[6].proj = nn.Linear(2304, 18)
         # self.model = make_kinetics_resnet()
 
-    def forward(self, x):
-        return self.model(x)
+    def forward(self, video, box):
+        box = torch.cat([torch.zeros([box.shape[0], 1]).to(box.device), box], dim=1)
+        return self.model(video, box)
 
     def training_step(self, batch, batch_idx):
         # print(len(batch['video']))
         # The model expects a video tensor of shape (B, C, T, H, W), which is the
         # format provided by the dataset
         self.model.train()
-        box = torch.cat([torch.arange(batch["box"].shape[0])[..., None], batch["box"]], dim=1)
+        box = torch.cat([torch.arange(batch["box"].shape[0])[..., None].to(batch["box"].device), batch["box"]], dim=1)
+        # print(batch['video'][0].shape)
+        # print(box.shape)
         y_hat = self.model(batch["video"], box)
 
         # Compute cross entropy loss, loss.backwards will be called behind the scenes
         # by PyTorchLightning after being returned from this method.
         # print(F.softmax(y_hat[0], dim=0))
         # print(batch["label"][0])
+        # label = F.one_hot(batch['label'], num_classes=18).to(y_hat.device).float()
         loss = F.cross_entropy(y_hat, batch["label"])
         accu = torch.sum(torch.argmax(y_hat, dim=1) == batch["label"]).item() / len(batch["label"])
         # Log the train loss to Tensorboard
@@ -47,14 +53,18 @@ class Detection(pytorch_lightning.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         self.model.eval()
-        box = torch.cat([torch.arange(batch["box"].shape[0])[..., None], batch["box"]], dim=1)
+        box = torch.cat([torch.arange(batch["box"].shape[0])[..., None].to(batch["box"].device), batch["box"]], dim=1)
         y_hat = self.model(batch["video"], box)
         # print(torch.argmax(y_hat, dim=1) == batch["label"])
         # print(torch.argmax(y_hat, dim=1), batch['label'])
         # print(F.softmax(y_hat, dim=1))
         # print(torch.argmax(y_hat, dim=1))
         accu = torch.sum(torch.argmax(y_hat, dim=1) == batch["label"]).item() / len(batch["label"])
+
+        # label = F.one_hot(batch['label'], num_classes=18).to(y_hat.device).float()
         loss = F.cross_entropy(y_hat, batch["label"])
+
+        # loss = F.cross_entropy(y_hat, batch["label"])
         self.log("val_loss", loss, prog_bar=True)
         self.log("val_accu", accu,prog_bar=True)
         return {'val_loss': loss, 'val_accu': accu}
@@ -83,8 +93,7 @@ def train():
     trainer = pytorch_lightning.Trainer(max_epochs=60,
         accelerator="gpu", devices=2, strategy=DDPStrategy(find_unused_parameters=False), num_sanity_val_steps=0, precision=16,
         enable_checkpointing=True, accumulate_grad_batches=4, sync_batchnorm=True, gradient_clip_val=5, gradient_clip_algorithm="value",)
-        # callbacks=[pytorch_lightning.callbacks.StochasticWeightAveraging(swa_lrs=1e-2)])
-        # resume_from_checkpoint="lightning_logs/version_36/checkpoints/epoch=17-step=216.ckpt")
+        # resume_from_checkpoint="lightning_logs/version_3/checkpoints/epoch=47-step=576.ckpt")
     trainer.fit(classification_module, data_module)
     # trainer.validate(classification_module, data_module.val_dataloader(), ckpt_path='lightning_logs/rear/checkpoints/epoch=59-step=600.ckpt')
 

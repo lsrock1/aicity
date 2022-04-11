@@ -121,6 +121,18 @@ transform_train_detection = Compose(
         )
 
 
+transform_val_detection = ApplyTransformToKey(
+    key="video",
+    transform=Compose(
+        [
+            UniformTemporalSubsample(num_frames),
+            Lambda(lambda x: x/255.0),
+            Normalize(mean, std),
+        ]
+    ),
+)
+
+
 class DataModule(pytorch_lightning.LightningDataModule):
 
     # Dataset configuration

@@ -93,14 +93,16 @@ def main():
     paths = sorted(paths)
     paths = [p for p in paths if 'Rear' in p]
     alloc = partial(func, predictor=predictor)
+
+    # with multiprocessing.Pool(processes=8) as pool:
+    #     for _ in tqdm(pool.imap_unordered(alloc, paths), total=len(paths)):
+    #         pass
+
+    paths = glob('dataset/frames24/A2/*/*')
     # multiprocessing.Pool(multiprocessing.cpu_count()).map(alloc, paths)
-    with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
+    with multiprocessing.Pool(processes=8) as pool:
         for _ in tqdm(pool.imap_unordered(alloc, paths), total=len(paths)):
             pass
-    # for path in paths:
-
-    # paths = glob('dataset/frames24/A2/*/*')
-    # multiprocessing.Pool(multiprocessing.cpu_count()).map(alloc, paths)
 
 
 if __name__ == '__main__':
